@@ -2,8 +2,6 @@ from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 import re
-from flask_cors import CORS
-import json
 
 app = Flask(__name__)
 
@@ -16,7 +14,7 @@ def home():
         "params": {
             "usn": "1MS18CS001",
             "dob": "2000-01-01",
-            "endpoint": "newparents"
+            "endpoint": "newparents, oddparents, evenparents"
         },
         "description": "Get student data from SIS",
     }
