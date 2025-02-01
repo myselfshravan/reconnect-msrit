@@ -70,6 +70,65 @@ def test():
                 "credit": 3,
             },
         ],
+        "academicHistory": {
+            "cumulative": {
+                "cgpa": "8.80",
+                "creditsEarned": "126",
+                "creditsToBeEarned": "34"
+            },
+            "semesters": [
+                {
+                    "cgpa": 0,
+                    "creditsEarned": "20",
+                    "creditsRegistered": "20",
+                    "semester": "Feb / Mar 2022",
+                    "sgpa": "8.75"
+                },
+                {
+                    "cgpa": "8.77",
+                    "creditsEarned": "16",
+                    "creditsRegistered": "20",
+                    "semester": "July 2022",
+                    "sgpa": "7.05"
+                },
+                {
+                    "cgpa": "8.59",
+                    "creditsEarned": "21",
+                    "creditsRegistered": "21",
+                    "semester": "Jan 2023",
+                    "sgpa": "8.28"
+                },
+                {
+                    "cgpa": "8.72",
+                    "creditsEarned": "22",
+                    "creditsRegistered": "22",
+                    "semester": "May/June 2023",
+                    "sgpa": "9.04"
+                },
+                {
+                    "cgpa": "8.68",
+                    "creditsEarned": "4",
+                    "creditsRegistered": "4",
+                    "semester": "Supplementary Semester July / August 2023",
+                    "sgpa": "8"
+                },
+                {
+                    "cgpa": "8.69",
+                    "creditsEarned": "21",
+                    "creditsRegistered": "21",
+                    "semester": "ODD - December 2023",
+                    "sgpa": "8.71"
+                },
+                {
+                    "cgpa": "8.80",
+                    "creditsEarned": "22",
+                    "creditsRegistered": "22",
+                    "semester": "EVEN - May 2024",
+                    "sgpa": "9.31"
+                }
+            ]
+        },
+        "cgpa": "8.80",
         "lastUpdated": '01/02/2025',
         "name": 'NISHA S',
         "usn": '1MS21CI035',
@@ -235,11 +294,74 @@ def get_student_data():
         else:
             last_updated = ""
 
+        result_url = f"{base_url}/index.php?option=com_history&task=getResult"
+        result_response = session.get(result_url, timeout=10)
+        cumulative_data = {}
+        semesters = []
+
+        if result_response.status_code == 200:
+            result_soup = BeautifulSoup(result_response.text, "html.parser")
+
+            # Parse the cumulative history cards (Credits Earned, Credits to be Earned, CGPA)
+            cumulative_div = result_soup.find("div", class_="detail3")
+            if cumulative_div:
+                cards = cumulative_div.find_all("div", class_="uk-card")
+                for card in cards:
+                    header = card.find("h3").get_text(strip=True) if card.find("h3") else ""
+                    value = card.find("p").get_text(strip=True) if card.find("p") else ""
+                    if "Credits Earned" in header:
+                        cumulative_data["creditsEarned"] = value
+                    elif "Credits to be" in header:
+                        cumulative_data["creditsToBeEarned"] = value
+                    elif header == "CGPA":
+                        cumulative_data["cgpa"] = value
+
+            # Helper to extract a number (integer or float) from a text string
+            def extract_number(text):
+                match = re.search(r"([\d.]+)", text)
+                return match.group(1) if match else None
+
+            # Parse semester-wise results using the table captions
+            # (each caption contains the semester name and spans with Credits Registered, Credits Earned, SGPA, and CGPA)
+            captions = result_soup.find_all("caption")
+            for cap in captions:
+                # The first text node in the caption is assumed to be the semester name
+                semester_name = cap.find(text=True, recursive=False)
+                semester_name = semester_name.strip() if semester_name else ""
+                registered = earned = sgpa = cgpa = None
+                for span in cap.find_all("span"):
+                    span_text = span.get_text(strip=True)
+                    if "Credits Registered" in span_text:
+                        registered = extract_number(span_text)
+                    elif "Credits Earned" in span_text:
+                        earned = extract_number(span_text)
+                    elif "SGPA" in span_text:
+                        sgpa = extract_number(span_text)
+                    elif "CGPA" in span_text:
+                        cgpa = extract_number(span_text)
+                if semester_name:
+                    semesters.append({
+                        "semester": semester_name,
+                        "creditsRegistered": registered,
+                        "creditsEarned": earned,
+                        "sgpa": sgpa,
+                        "cgpa": cgpa,
+                    })
+        # -------------------------------
+        # End additional academic history parsing
+        # -------------------------------
+
+        # Build final data structure
         data = {
             "name": student_name,
             "usn": student_id,
             "courses": courses,
-            "lastUpdated": last_updated
+            "lastUpdated": last_updated,
+            "cgpa": cumulative_data.get("cgpa"),
+            "academicHistory": {
+                "cumulative": cumulative_data,
+                "semesters": semesters
+            }
         }
 
         return jsonify(data), 200
