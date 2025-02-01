@@ -155,12 +155,165 @@ def handle_post():
     return jsonify(response_data), 200
 
 
+def predict_see_score(internal: float, scenario: str) -> float:
+    """
+    Predict the SEE score (out of 100) given the internal score (out of 50)
+    and the scenario:
+      - "atleast":    Exponent = 2.2 (more punishing; lower SEE prediction)
+      - "mostlikely": Exponent = 2.0
+      - "maxeffort":  Exponent = 1.5 (less punishing; higher SEE prediction)
+
+    The SEE score is calculated as:
+         SEE = 35 + (100 - 35) * ((internal/50)^exponent)
+    """
+    # Choose the exponent based on scenario
+    if scenario == "atleast":
+        exponent = 2.2
+    elif scenario == "mostlikely":
+        exponent = 2.0
+    elif scenario == "maxeffort":
+        exponent = 1.5
+    else:
+        exponent = 2.0  # default
+
+    fraction = (internal / 50.0) ** exponent
+    predicted_see = 35 + (100 - 35) * fraction
+    # Clamp predicted SEE between 35 and 100
+    return max(35, min(predicted_see, 100))
+
+
+def assign_letter_grade(total_score: float) -> str:
+    """
+    Assign a letter grade based on total marks (internal + SEE) out of 150.
+    (We scale the original thresholds by 1.5; e.g. original O threshold was 90/100, now 90*1.5 = 135.)
+    """
+    thresholds = [
+        ("O", 135),  # 90 * 1.5
+        ("A+", 120),  # 80 * 1.5
+        ("A", 105),  # 70 * 1.5
+        ("B+", 90),  # 60 * 1.5
+        ("B", 82.5),  # 55 * 1.5
+        ("C", 75),  # 50 * 1.5
+        ("P", 60)  # 40 * 1.5
+    ]
+    for grade, thresh in thresholds:
+        if total_score >= thresh:
+            return grade
+    return "F"  # Below the minimum threshold
+
+
+def letter_grade_to_point(letter: str) -> float:
+    """
+    Convert a letter grade to its numeric grade–point.
+    (The mapping here can be tuned; we assume O and A+ are 10, A is 9, etc.)
+    """
+    mapping = {
+        "O": 10,
+        "A+": 9,
+        "A": 8,
+        "B+": 7,
+        "B": 6,
+        "C": 5,
+        "P": 4,
+        "F": 0
+    }
+    return mapping.get(letter, 0)
+
+
+def predict_sgpa(data: dict) -> dict:
+    """
+    Given a student's data (with a list of courses, each having an internal score and credit),
+    predict the SGPA for three scenarios:
+      - "atleast"
+      - "mostlikely"
+      - "maxeffort"
+
+    For each course, we:
+      1. Read the internal score (assumed out of 50).
+      2. Predict the SEE score (out of 100) using an exponential function that varies by scenario.
+      3. Compute the total marks (internal + SEE) out of 150.
+      4. Assign a letter grade using scaled thresholds.
+      5. Convert that grade to a grade–point.
+      6. Multiply by the course credit.
+
+    Finally, SGPA = (sum of (credit * grade_point)) / (sum of credits).
+
+    The function returns a dictionary with keys "atleast", "mostlikely", "maxeffort" each holding:
+       - predicted_sgpa (a float)
+       - course_details: a list with the breakdown per course.
+    """
+    scenarios = ["atleast", "mostlikely", "maxeffort"]
+    results = {}
+    courses = data.get("courses", [])
+
+    # First, compute the total credits (assumed the same for all scenarios)
+    total_credits = 0.0
+    for course in courses:
+        try:
+            total_credits += float(course.get("credit", 0))
+        except Exception:
+            pass
+    if total_credits == 0:
+        # Avoid division by zero; return empty results.
+        return {s: {"predicted_sgpa": 0.0, "course_details": []} for s in scenarios}
+
+    # Process each scenario
+    for scenario in scenarios:
+        scenario_total_gp = 0.0  # accumulator for (credit * grade_point)
+        course_details = []
+        for course in courses:
+            course_code = course.get("CourseCode", "")
+            course_name = course.get("CourseName", "")
+            try:
+                internal = float(course.get("InternalScore", 0))
+            except Exception:
+                internal = 0.0
+            try:
+                credit = float(course.get("credit", 0))
+            except Exception:
+                credit = 0.0
+
+            # Predict SEE score for the current scenario:
+            predicted_see = predict_see_score(internal, scenario)
+            # Total marks (internal is out of 50, SEE out of 100 → total out of 150)
+            total_marks = internal + predicted_see
+            final_marks = internal + predicted_see / 2.0
+            # Determine the letter grade based on total marks:
+            letter_grade = assign_letter_grade(total_marks)
+            # Convert letter grade to numeric grade point:
+            gp = letter_grade_to_point(letter_grade)
+            # Accumulate weighted grade points:
+            scenario_total_gp += credit * gp
+
+            course_details.append({
+                "CourseCode": course_code,
+                "CourseName": course_name,
+                "Internal": internal,
+                "Predicted_SEE": round(predicted_see, 2),
+                "Total_Marks": round(total_marks, 2),
+                "Final_Marks": round(final_marks, 2),
+                "Letter_Grade": letter_grade,
+                "Grade_Point": gp,
+                "Credit": credit
+            })
+
+        # Compute SGPA as weighted average of grade points:
+        predicted_sgpa = round(scenario_total_gp / total_credits, 2)
+        results[scenario] = {
+            "predicted_sgpa": predicted_sgpa,
+            "course_details": course_details
+        }
+
+    return results
+
+
 @app.route("/sis", methods=["GET"])
 def get_student_data():
     usn = request.args.get("usn", "").strip()
     dob = request.args.get("dob", "").strip()
     endpoint = request.args.get("endpoint", "").strip()
     base_url = f"https://parents.msrit.edu/{endpoint}"
+    fast = request.args.get("fast", "false").lower() == "true"
 
     if not usn or not dob:
         return jsonify({"error": "Missing usn or dob parameter"}), 400
@@ -250,34 +403,35 @@ def get_student_data():
                 })
 
         credit_mapping = {}
-        feedback_url = f"{base_url}/index.php?option=com_coursefeedback&controller=feedbackentry&task=feedback"
-        feedback_response = session.get(feedback_url, timeout=10)
-        if feedback_response.status_code == 200:
-            feedback_soup = BeautifulSoup(feedback_response.text, "html.parser")
-            feedback_table = feedback_soup.find("table")
-            if feedback_table:
-                tbody = feedback_table.find("tbody")
-                if tbody:
-                    for row in tbody.find_all("tr"):
-                        cells = row.find_all("td")
-                        if len(cells) < 4:
-                            continue
-                        course_code_fb = cells[1].text.strip()
-                        a_tag = cells[3].find("a", href=True)
-                        if not a_tag:
-                            continue
-                        feedback_link = a_tag["href"]
-                        if not feedback_link.startswith("http"):
-                            feedback_link = f"{base_url}/" + feedback_link
+        if not fast:
+            feedback_url = f"{base_url}/index.php?option=com_coursefeedback&controller=feedbackentry&task=feedback"
+            feedback_response = session.get(feedback_url, timeout=10)
+            if feedback_response.status_code == 200:
+                feedback_soup = BeautifulSoup(feedback_response.text, "html.parser")
+                feedback_table = feedback_soup.find("table")
+                if feedback_table:
+                    tbody = feedback_table.find("tbody")
+                    if tbody:
+                        for row in tbody.find_all("tr"):
+                            cells = row.find_all("td")
+                            if len(cells) < 4:
+                                continue
+                            course_code_fb = cells[1].text.strip()
+                            a_tag = cells[3].find("a", href=True)
+                            if not a_tag:
+                                continue
+                            feedback_link = a_tag["href"]
+                            if not feedback_link.startswith("http"):
+                                feedback_link = f"{base_url}/" + feedback_link
 
-                        course_feedback_response = session.get(feedback_link, timeout=10)
-                        if course_feedback_response.status_code == 200:
-                            course_feedback_soup = BeautifulSoup(course_feedback_response.text, "html.parser")
-                            credit_div = course_feedback_soup.find("div",
-                                                                   style=lambda s: s and "font-size:35px" in s)
-                            if credit_div:
-                                credit_value = credit_div.text.strip()
-                                credit_mapping[course_code_fb] = credit_value
+                            course_feedback_response = session.get(feedback_link, timeout=10)
+                            if course_feedback_response.status_code == 200:
+                                course_feedback_soup = BeautifulSoup(course_feedback_response.text, "html.parser")
+                                credit_div = course_feedback_soup.find("div",
+                                                                       style=lambda s: s and "font-size:35px" in s)
+                                if credit_div:
+                                    credit_value = credit_div.text.strip()
+                                    credit_mapping[course_code_fb] = credit_value
 
         for course in courses:
             code = course.get("CourseCode")
@@ -316,16 +470,12 @@ def get_student_data():
                     elif header == "CGPA":
                         cumulative_data["cgpa"] = value
 
-            # Helper to extract a number (integer or float) from a text string
             def extract_number(text):
                 match = re.search(r"([\d.]+)", text)
                 return match.group(1) if match else None
 
-            # Parse semester-wise results using the table captions
-            # (each caption contains the semester name and spans with Credits Registered, Credits Earned, SGPA, and CGPA)
             captions = result_soup.find_all("caption")
             for cap in captions:
-                # The first text node in the caption is assumed to be the semester name
                 semester_name = cap.find(text=True, recursive=False)
                 semester_name = semester_name.strip() if semester_name else ""
                 registered = earned = sgpa = cgpa = None
@@ -348,8 +498,14 @@ def get_student_data():
                         "cgpa": cgpa,
                     })
         # -------------------------------
-        # End additional academic history parsing
+        # Start the prediction
         # -------------------------------
+
+        # Predict SGPA for three scenarios
+        prediction_data = {
+            "courses": courses
+        }
+        prediction_results = predict_sgpa(prediction_data)
 
         # Build final data structure
         data = {
@@ -361,7 +517,8 @@ def get_student_data():
             "academicHistory": {
                 "cumulative": cumulative_data,
                 "semesters": semesters
-            }
+            },
+            "predictions": prediction_results
         }
 
         return jsonify(data), 200
