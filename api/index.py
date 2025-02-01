@@ -2,10 +2,10 @@ from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 import re
-# from flask_cors import CORS
+from flask_cors import CORS
 
 app = Flask(__name__)
-# CORS(app)
+CORS(app)
 
 
 @app.route('/', methods=['GET'])
@@ -19,6 +19,60 @@ def home():
             "endpoint": "newparents, oddparents, evenparents"
         },
         "description": "Get student data from SIS",
+    }
+    return jsonify(data), 200
+
+
+@app.route('/test', methods=['GET'])
+def test():
+    data = {
+        "courses": [
+            {
+                "CourseCode": 'CI71',
+                "CourseName": 'Multicore Architecture and programming',
+                "InternalScore": 41,
+                "attendance": 87,
+                "credit": 4,
+            },
+            {
+                "CourseCode": 'CI72',
+                "CourseName": 'Foundations of Computer Vision',
+                "InternalScore": 37,
+                "attendance": 86,
+                "credit": 3,
+            },
+            {
+                "CourseCode": 'CIL74',
+                "CourseName": 'Containerization Laboratory',
+                "InternalScore": 40,
+                "attendance": 90,
+                "credit": 1,
+            },
+            {
+                "CourseCode": 'CIL75',
+                "CourseName": 'Skill Enhancement Lab -Generative AI',
+                "InternalScore": 46,
+                "attendance": 86,
+                "credit": 3,
+            },
+            {
+                "CourseCode": 'CIE731',
+                "CourseName": 'Information Retrieval',
+                "InternalScore": 31,
+                "attendance": 76,
+                "credit": 3,
+            },
+            {
+                "CourseCode": 'MEOE07',
+                "CourseName": 'Product Design and Manufacturing',
+                "InternalScore": 37,
+                "attendance": 88,
+                "credit": 3,
+            },
+        ],
+        "lastUpdated": '01/02/2025',
+        "name": 'NISHA S',
+        "usn": '1MS21CI035',
     }
     return jsonify(data), 200
 
