@@ -1,3 +1,4 @@
+import math
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -155,57 +156,65 @@ def handle_post():
     return jsonify(response_data), 200
 
 
-def predict_see_score(internal: float, scenario: str) -> float:
+def predict_final_score(internal_score, scenario="mostlikely"):
     """
-    Predict the SEE score (out of 100) given the internal score (out of 50)
-    and the scenario:
-      - "atleast":    Exponent = 2.2 (more punishing; lower SEE prediction)
-      - "mostlikely": Exponent = 2.0
-      - "maxeffort":  Exponent = 1.5 (less punishing; higher SEE prediction)
-
-    The SEE score is calculated as:
-         SEE = 35 + (100 - 35) * ((internal/50)^exponent)
+    Predict the final (out of 100) based on:
+      - internal_score (out of 50),
+      - scenario multipliers,
+      - exponential decay above a base cap (70).
     """
-    # Choose the exponent based on scenario
-    if scenario == "atleast":
-        exponent = 2.2
-    elif scenario == "mostlikely":
-        exponent = 2.0
-    elif scenario == "maxeffort":
-        exponent = 1.5
-    else:
-        exponent = 2.0  # default
+    scenario_multipliers = {
+        "atleast": 0.85,  # Conservative
+        "mostlikely": 1.0,  # Expected
+        "maxeffort": 1.15  # Best-case
+    }
 
-    fraction = (internal / 50.0) ** exponent
-    predicted_see = 35 + (100 - 35) * fraction
-    # Clamp predicted SEE between 35 and 100
-    return max(35, min(predicted_see, 100))
+    # Base projection: simply double the internal (since internal is out of 50)
+    base_projection = internal_score * 2
+
+    # If base_projection > 70, apply exponential decay on the "excess".
+    if base_projection > 70:
+        excess = base_projection - 70
+        scaled_excess = excess * math.exp(-excess / 50.0)  # exponential decay
+        base_projection = 70 + scaled_excess
+
+    # Multiply by scenario-based factor
+    final_projection = base_projection * scenario_multipliers.get(scenario, 1.0)
+    # Ensure final doesn't exceed 100
+    return min(final_projection, 100.0)
 
 
-def assign_letter_grade(total_score: float) -> str:
+def calculate_total_score(internal_score, predicted_final):
     """
-    Assign a letter grade based on total marks (internal + SEE) out of 150.
-    (We scale the original thresholds by 1.5; e.g. original O threshold was 90/100, now 90*1.5 = 135.)
+    Convert internal (out of 50) + final (out of 100) → total out of 100.
+    We do this by: internal_score + (predicted_final / 2).
+    """
+    return internal_score + (predicted_final / 2.0)
+
+
+def letter_grade_from_100(score_out_of_100):
+    """
+    Given a score out of 100, assign a letter grade.
+    Adjust thresholds if you prefer different cutoffs.
     """
     thresholds = [
-        ("O", 135),  # 90 * 1.5
-        ("A+", 120),  # 80 * 1.5
-        ("A", 105),  # 70 * 1.5
-        ("B+", 90),  # 60 * 1.5
-        ("B", 82.5),  # 55 * 1.5
-        ("C", 75),  # 50 * 1.5
-        ("P", 60)  # 40 * 1.5
+        ("O", 90),
+        ("A+", 80),
+        ("A", 70),
+        ("B+", 60),
+        ("B", 55),
+        ("C", 50),
+        ("P", 40)
     ]
-    for grade, thresh in thresholds:
-        if total_score >= thresh:
+    for grade, cutoff in thresholds:
+        if score_out_of_100 >= cutoff:
             return grade
-    return "F"  # Below the minimum threshold
+    return "F"
 
 
-def letter_grade_to_point(letter: str) -> float:
+def letter_grade_to_point(letter):
     """
-    Convert a letter grade to its numeric grade–point.
-    (The mapping here can be tuned; we assume O and A+ are 10, A is 9, etc.)
+    Map each letter grade to numeric grade–points.
     """
     mapping = {
         "O": 10,
@@ -220,87 +229,63 @@ def letter_grade_to_point(letter: str) -> float:
     return mapping.get(letter, 0)
 
 
-def predict_sgpa(data: dict) -> dict:
+def predict_sgpa(data):
     """
-    Given a student's data (with a list of courses, each having an internal score and credit),
-    predict the SGPA for three scenarios:
-      - "atleast"
-      - "mostlikely"
-      - "maxeffort"
+    Incorporate the new final-exam prediction logic into an SGPA calculation
+    across three scenarios: 'atleast', 'mostlikely', 'maxeffort'.
 
-    For each course, we:
-      1. Read the internal score (assumed out of 50).
-      2. Predict the SEE score (out of 100) using an exponential function that varies by scenario.
-      3. Compute the total marks (internal + SEE) out of 150.
-      4. Assign a letter grade using scaled thresholds.
-      5. Convert that grade to a grade–point.
-      6. Multiply by the course credit.
+    Steps for each course & scenario:
+      1. Predict final exam out of 100 (via predict_final_score).
+      2. Compute total out of 100 (internal + final/2).
+      3. Assign a letter grade (out of 100).
+      4. Convert to grade-points.
+      5. Multiply by course credit and accumulate.
 
-    Finally, SGPA = (sum of (credit * grade_point)) / (sum of credits).
-
-    The function returns a dictionary with keys "atleast", "mostlikely", "maxeffort" each holding:
-       - predicted_sgpa (a float)
-       - course_details: a list with the breakdown per course.
+    Finally, SGPA = ( sum(grade_point * credit) ) / ( sum of credits ).
     """
     scenarios = ["atleast", "mostlikely", "maxeffort"]
-    results = {}
     courses = data.get("courses", [])
 
-    # First, compute the total credits (assumed the same for all scenarios)
-    total_credits = 0.0
-    for course in courses:
-        try:
-            total_credits += float(course.get("credit", 0))
-        except Exception:
-            pass
+    # Safeguard: sum up the total credits
+    total_credits = sum(float(course.get("credit", 0)) for course in courses)
     if total_credits == 0:
-        # Avoid division by zero; return empty results.
-        return {s: {"predicted_sgpa": 0.0, "course_details": []} for s in scenarios}
+        return {
+            scenario: {"predicted_sgpa": 0.0, "course_details": []}
+            for scenario in scenarios
+        }
 
-    # Process each scenario
+    results = {}
     for scenario in scenarios:
-        scenario_total_gp = 0.0  # accumulator for (credit * grade_point)
+        scenario_total_gp = 0.0
         course_details = []
+
         for course in courses:
             course_code = course.get("CourseCode", "")
             course_name = course.get("CourseName", "")
-            try:
-                internal = float(course.get("InternalScore", 0))
-            except Exception:
-                internal = 0.0
-            try:
-                credit = float(course.get("credit", 0))
-            except Exception:
-                credit = 0.0
+            credit = float(course.get("credit", 0))
+            internal_score = float(course.get("InternalScore", 0))
+            predicted_final = predict_final_score(internal_score, scenario)
+            total_score_100 = calculate_total_score(internal_score, predicted_final)
+            letter_grade = letter_grade_from_100(total_score_100)
+            grade_points = letter_grade_to_point(letter_grade)
+            scenario_total_gp += (grade_points * credit)
 
-            # Predict SEE score for the current scenario:
-            predicted_see = predict_see_score(internal, scenario)
-            # Total marks (internal is out of 50, SEE out of 100 → total out of 150)
-            total_marks = internal + predicted_see
-            final_marks = internal + predicted_see / 2.0
-            # Determine the letter grade based on total marks:
-            letter_grade = assign_letter_grade(total_marks)
-            # Convert letter grade to numeric grade point:
-            gp = letter_grade_to_point(letter_grade)
-            # Accumulate weighted grade points:
-            scenario_total_gp += credit * gp
-
+            # Keep record for each course
             course_details.append({
                 "CourseCode": course_code,
                 "CourseName": course_name,
-                "Internal": internal,
-                "Predicted_SEE": round(predicted_see, 2),
-                "Total_Marks": round(total_marks, 2),
-                "Final_Marks": round(final_marks, 2),
-                "Letter_Grade": letter_grade,
-                "Grade_Point": gp,
+                "InternalScore_out_of_50": internal_score,
+                "PredictedFinal_out_of_100": round(predicted_final, 1),
+                "Total_out_of_100": round(total_score_100, 1),
+                "LetterGrade": letter_grade,
+                "GradePoints": grade_points,
                 "Credit": credit
             })
 
-        # Compute SGPA as weighted average of grade points:
-        predicted_sgpa = round(scenario_total_gp / total_credits, 2)
+        # (5) Overall SGPA for this scenario
+        scenario_sgpa = scenario_total_gp / total_credits
         results[scenario] = {
-            "predicted_sgpa": predicted_sgpa,
+            "predicted_sgpa": round(scenario_sgpa, 2),
             "course_details": course_details
         }
 
