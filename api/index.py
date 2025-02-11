@@ -29,51 +29,51 @@ def test():
     data = {
         "courses": [
             {
-                "CourseCode": 'CI71',
-                "CourseName": 'Multicore Architecture and programming',
-                "InternalScore": 41,
-                "attendance": 87,
-                "credit": 4,
-            },
-            {
-                "CourseCode": 'CI72',
-                "CourseName": 'Foundations of Computer Vision',
-                "InternalScore": 37,
-                "attendance": 86,
-                "credit": 3,
-            },
-            {
-                "CourseCode": 'CIL74',
-                "CourseName": 'Containerization Laboratory',
-                "InternalScore": 40,
-                "attendance": 90,
-                "credit": 1,
-            },
-            {
-                "CourseCode": 'CIL75',
-                "CourseName": 'Skill Enhancement Lab -Generative AI',
-                "InternalScore": 46,
-                "attendance": 86,
-                "credit": 3,
-            },
-            {
-                "CourseCode": 'CIE731',
-                "CourseName": 'Information Retrieval',
-                "InternalScore": 31,
-                "attendance": 76,
-                "credit": 3,
-            },
-            {
-                "CourseCode": 'MEOE07',
-                "CourseName": 'Product Design and Manufacturing',
-                "InternalScore": 37,
+                "CourseCode": "CI71",
+                "CourseName": "Multicore Architecture and programming",
+                "InternalScore": 48,
                 "attendance": 88,
-                "credit": 3,
+                "credit": 4
             },
+            {
+                "CourseCode": "CI72",
+                "CourseName": "Foundations of Computer Vision",
+                "InternalScore": 47,
+                "attendance": 86,
+                "credit": 3
+            },
+            {
+                "CourseCode": "CIL74",
+                "CourseName": "Containerization Laboratory",
+                "InternalScore": 46,
+                "attendance": 90,
+                "credit": 1
+            },
+            {
+                "CourseCode": "CIL75",
+                "CourseName": "Skill Enhancement Lab -Generative AI",
+                "InternalScore": 45,
+                "attendance": 86,
+                "credit": 3
+            },
+            {
+                "CourseCode": "CIE731",
+                "CourseName": "Information Retrieval",
+                "InternalScore": 44,
+                "attendance": 76,
+                "credit": 3
+            },
+            {
+                "CourseCode": "ETOE02",
+                "CourseName": "Wireless Sensor Networks",
+                "InternalScore": 43,
+                "attendance": 78,
+                "credit": 3
+            }
         ],
         "academicHistory": {
             "cumulative": {
-                "cgpa": "8.80",
+                "cgpa": "9.99",
                 "creditsEarned": "126",
                 "creditsToBeEarned": "34"
             },
@@ -107,13 +107,6 @@ def test():
                     "sgpa": "9.04"
                 },
                 {
-                    "cgpa": "8.68",
-                    "creditsEarned": "4",
-                    "creditsRegistered": "4",
-                    "semester": "Supplementary Semester July / August 2023",
-                    "sgpa": "8"
-                },
-                {
                     "cgpa": "8.69",
                     "creditsEarned": "21",
                     "creditsRegistered": "21",
@@ -129,10 +122,207 @@ def test():
                 }
             ]
         },
-        "cgpa": "8.80",
-        "lastUpdated": '01/02/2025',
-        "name": 'NISHA S',
-        "usn": '1MS21CI035',
+        "predictions": {
+            "atleast": {
+                "course_details": [
+                    {
+                        "CourseCode": "CI71",
+                        "CourseName": "Multicore Architecture and programming",
+                        "Credit": 4,
+                        "GradePoints": 9,
+                        "InternalScore_out_of_50": 48,
+                        "LetterGrade": "A+",
+                        "PredictedFinal_out_of_100": 72.6,
+                        "Total_out_of_100": 84.3
+                    },
+                    {
+                        "CourseCode": "CI72",
+                        "CourseName": "Foundations of Computer Vision",
+                        "Credit": 3,
+                        "GradePoints": 7,
+                        "InternalScore_out_of_50": 37,
+                        "LetterGrade": "B+",
+                        "PredictedFinal_out_of_100": 62.6,
+                        "Total_out_of_100": 68.3
+                    },
+                    {
+                        "CourseCode": "CIL74",
+                        "CourseName": "Containerization Laboratory",
+                        "Credit": 1,
+                        "GradePoints": 9,
+                        "InternalScore_out_of_50": 50,
+                        "LetterGrade": "A+",
+                        "PredictedFinal_out_of_100": 73.5,
+                        "Total_out_of_100": 86.7
+                    },
+                    {
+                        "CourseCode": "CIL75",
+                        "CourseName": "Skill Enhancement Lab -Generative AI",
+                        "Credit": 3,
+                        "GradePoints": 9,
+                        "InternalScore_out_of_50": 48,
+                        "LetterGrade": "A+",
+                        "PredictedFinal_out_of_100": 72.6,
+                        "Total_out_of_100": 84.3
+                    },
+                    {
+                        "CourseCode": "CIE731",
+                        "CourseName": "Information Retrieval",
+                        "Credit": 3,
+                        "GradePoints": 6,
+                        "InternalScore_out_of_50": 31,
+                        "LetterGrade": "B",
+                        "PredictedFinal_out_of_100": 52.7,
+                        "Total_out_of_100": 57.3
+                    },
+                    {
+                        "CourseCode": "ETOE02",
+                        "CourseName": "Wireless Sensor Networks",
+                        "Credit": 3,
+                        "GradePoints": 8,
+                        "InternalScore_out_of_50": 40,
+                        "LetterGrade": "A",
+                        "PredictedFinal_out_of_100": 66.5,
+                        "Total_out_of_100": 73.2
+                    }
+                ],
+                "predicted_sgpa": 7.94
+            },
+            "maxeffort": {
+                "course_details": [
+                    {
+                        "CourseCode": "CI71",
+                        "CourseName": "Multicore Architecture and programming",
+                        "Credit": 4,
+                        "GradePoints": 10,
+                        "InternalScore_out_of_50": 48,
+                        "LetterGrade": "O",
+                        "PredictedFinal_out_of_100": 98.3,
+                        "Total_out_of_100": 97.1
+                    },
+                    {
+                        "CourseCode": "CI72",
+                        "CourseName": "Foundations of Computer Vision",
+                        "Credit": 3,
+                        "GradePoints": 8,
+                        "InternalScore_out_of_50": 37,
+                        "LetterGrade": "A",
+                        "PredictedFinal_out_of_100": 84.7,
+                        "Total_out_of_100": 79.4
+                    },
+                    {
+                        "CourseCode": "CIL74",
+                        "CourseName": "Containerization Laboratory",
+                        "Credit": 1,
+                        "GradePoints": 10,
+                        "InternalScore_out_of_50": 50,
+                        "LetterGrade": "O",
+                        "PredictedFinal_out_of_100": 99.4,
+                        "Total_out_of_100": 99.7
+                    },
+                    {
+                        "CourseCode": "CIL75",
+                        "CourseName": "Skill Enhancement Lab -Generative AI",
+                        "Credit": 3,
+                        "GradePoints": 10,
+                        "InternalScore_out_of_50": 48,
+                        "LetterGrade": "O",
+                        "PredictedFinal_out_of_100": 98.3,
+                        "Total_out_of_100": 97.1
+                    },
+                    {
+                        "CourseCode": "CIE731",
+                        "CourseName": "Information Retrieval",
+                        "Credit": 3,
+                        "GradePoints": 7,
+                        "InternalScore_out_of_50": 31,
+                        "LetterGrade": "B+",
+                        "PredictedFinal_out_of_100": 71.3,
+                        "Total_out_of_100": 66.7
+                    },
+                    {
+                        "CourseCode": "ETOE02",
+                        "CourseName": "Wireless Sensor Networks",
+                        "Credit": 3,
+                        "GradePoints": 9,
+                        "InternalScore_out_of_50": 40,
+                        "LetterGrade": "A+",
+                        "PredictedFinal_out_of_100": 89.9,
+                        "Total_out_of_100": 85
+                    }
+                ],
+                "predicted_sgpa": 8.94
+            },
+            "mostlikely": {
+                "course_details": [
+                    {
+                        "CourseCode": "CI71",
+                        "CourseName": "Multicore Architecture and programming",
+                        "Credit": 4,
+                        "GradePoints": 10,
+                        "InternalScore_out_of_50": 48,
+                        "LetterGrade": "O",
+                        "PredictedFinal_out_of_100": 85.5,
+                        "Total_out_of_100": 90.7
+                    },
+                    {
+                        "CourseCode": "CI72",
+                        "CourseName": "Foundations of Computer Vision",
+                        "Credit": 3,
+                        "GradePoints": 8,
+                        "InternalScore_out_of_50": 37,
+                        "LetterGrade": "A",
+                        "PredictedFinal_out_of_100": 73.7,
+                        "Total_out_of_100": 73.8
+                    },
+                    {
+                        "CourseCode": "CIL74",
+                        "CourseName": "Containerization Laboratory",
+                        "Credit": 1,
+                        "GradePoints": 10,
+                        "InternalScore_out_of_50": 50,
+                        "LetterGrade": "O",
+                        "PredictedFinal_out_of_100": 86.5,
+                        "Total_out_of_100": 93.2
+                    },
+                    {
+                        "CourseCode": "CIL75",
+                        "CourseName": "Skill Enhancement Lab -Generative AI",
+                        "Credit": 3,
+                        "GradePoints": 10,
+                        "InternalScore_out_of_50": 48,
+                        "LetterGrade": "O",
+                        "PredictedFinal_out_of_100": 85.5,
+                        "Total_out_of_100": 90.7
+                    },
+                    {
+                        "CourseCode": "CIE731",
+                        "CourseName": "Information Retrieval",
+                        "Credit": 3,
+                        "GradePoints": 7,
+                        "InternalScore_out_of_50": 31,
+                        "LetterGrade": "B+",
+                        "PredictedFinal_out_of_100": 62,
+                        "Total_out_of_100": 62
+                    },
+                    {
+                        "CourseCode": "ETOE02",
+                        "CourseName": "Wireless Sensor Networks",
+                        "Credit": 3,
+                        "GradePoints": 8,
+                        "InternalScore_out_of_50": 40,
+                        "LetterGrade": "A",
+                        "PredictedFinal_out_of_100": 78.2,
+                        "Total_out_of_100": 79.1
+                    }
+                ],
+                "predicted_sgpa": 8.76
+            }
+        },
+        "cgpa": "9.99",
+        "lastUpdated": '11/02/2025',
+        "name": 'TEST USER',
+        "usn": '1MS21AB001',
     }
     return jsonify(data), 200
 
