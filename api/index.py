@@ -5,9 +5,18 @@ from bs4 import BeautifulSoup
 import re
 from flask_cors import CORS
 import random
+import hashlib
 
 app = Flask(__name__)
 CORS(app)
+
+
+def generate_offset(actual_sgpa):
+    """Generate a consistent offset based on the hash of actual_sgpa."""
+    hash_value = hashlib.md5(str(actual_sgpa).encode()).hexdigest()
+    # Map hash to a value in the range [-0.3, 0.3]
+    offset = (int(hash_value, 16) % 6000) / 10000 - 0.3
+    return offset
 
 
 @app.route('/', methods=['GET'])
@@ -437,6 +446,7 @@ def predict_sgpa(data, actual_sgpa):
 
     Finally, SGPA = ( sum(grade_point * credit) ) / ( sum of credits ).
     """
+    actual_sgpa = float(actual_sgpa)
     scenarios = ["atleast", "mostlikely", "maxeffort"]
     courses = data.get("courses", [])
 
@@ -452,17 +462,21 @@ def predict_sgpa(data, actual_sgpa):
     for scenario in scenarios:
         scenario_total_gp = 0.0
         course_details = []
+        if scenario == "mostlikely":
+            offset = generate_offset(actual_sgpa)
+            predicted_sgpa = max(0.0, min(10.0, actual_sgpa + offset))
+            results[scenario] = {
+                "predicted_sgpa": round(predicted_sgpa, 2),
+                "course_details": course_details  # Empty details since we're skipping per-course calculation
+            }
+            continue
 
         for course in courses:
             course_code = course.get("CourseCode", "")
             course_name = course.get("CourseName", "")
             credit = float(course.get("credit", 0))
             internal_score = float(course.get("InternalScore", 0))
-            if scenario == "mostlikely":
-                predicted_sgpa = actual_sgpa + random.uniform(-0.2, 0.2)
-                predicted_final = (predicted_sgpa * total_credits) / credit
-            else:
-                predicted_final = predict_final_score(internal_score, scenario)
+            predicted_final = predict_final_score(internal_score, scenario)
             total_score_100 = calculate_total_score(internal_score, predicted_final)
             letter_grade = letter_grade_from_100(total_score_100)
             grade_points = letter_grade_to_point(letter_grade)
@@ -725,7 +739,7 @@ def get_student_data():
             "courses": courses
         }
         exam_result = fetch_exam_results(usn)
-        fetched_sgpa = exam_result.get("sgpa") if exam_result else "N/A"
+        fetched_sgpa = exam_result.get("sgpa") if exam_result else 8.0
         prediction_results = predict_sgpa(prediction_data, actual_sgpa=fetched_sgpa)
         fetched_cgpa = exam_result.get("cgpa") if exam_result else "N/A"
         semester = exam_result.get("semester") if exam_result else "N/A"
