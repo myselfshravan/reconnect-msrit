@@ -324,7 +324,8 @@ def test():
         "name": 'TEST USER',
         "usn": '1MS21AB001',
         "fetched_sgpa": "8.81",
-        "fetched_cgpa": "8.67"
+        "fetched_cgpa": "8.67",
+        "semester": "Semister 7"
     }
     return jsonify(data), 200
 
@@ -511,8 +512,9 @@ def fetch_exam_results(usn):
             name = soup.find_all("h3")[0].text.strip()
             sgpa = soup.find_all("p")[3].text.strip()
             cgpa = soup.find_all("p")[4].text.strip()
+            sem = soup.find("p").text.split(",")[-1].strip()
 
-            return {"sgpa": sgpa, "cgpa": cgpa}
+            return {"sgpa": sgpa, "cgpa": cgpa, "semester": sem, "name": name}
         except (IndexError, AttributeError):
             return None
 
@@ -723,6 +725,7 @@ def get_student_data():
         exam_result = fetch_exam_results(usn)
         fetched_sgpa = exam_result.get("sgpa") if exam_result else "N/A"
         fetched_cgpa = exam_result.get("cgpa") if exam_result else "N/A"
+        semester = exam_result.get("semester") if exam_result else "N/A"
 
         # Build final data structure
         data = {
@@ -737,7 +740,8 @@ def get_student_data():
             },
             "predictions": prediction_results,
             "fetched_sgpa": fetched_sgpa,
-            "fetched_cgpa": fetched_cgpa
+            "fetched_cgpa": fetched_cgpa,
+            "semester": semester
         }
 
         return jsonify(data), 200
