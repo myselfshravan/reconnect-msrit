@@ -323,6 +323,8 @@ def test():
         "lastUpdated": '11/02/2025',
         "name": 'TEST USER',
         "usn": '1MS21AB001',
+        "fetched_sgpa": "8.81",
+        "fetched_cgpa": "8.67"
     }
     return jsonify(data), 200
 
