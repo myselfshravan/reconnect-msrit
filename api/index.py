@@ -482,6 +482,43 @@ def predict_sgpa(data):
     return results
 
 
+def fetch_exam_results(usn):
+    BASE_URL = "https://exam.msrit.edu/"
+    url = f"{BASE_URL}"
+    payload = {
+        "usn": usn.upper(),
+        "osolCatchaTxt": "",
+        "osolCatchaTxtInst": "0",
+        "option": "com_examresult",
+        "task": "getResult"
+    }
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                      "AppleWebKit/537.36 (KHTML, like Gecko) "
+                      "Chrome/96.0.4664.45 Safari/537.36"
+    }
+
+    try:
+        response = requests.post(url, data=payload, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+
+        # Validate if result exists
+        try:
+            name = soup.find_all("h3")[0].text.strip()
+            sgpa = soup.find_all("p")[3].text.strip()
+            cgpa = soup.find_all("p")[4].text.strip()
+
+            return {"sgpa": sgpa, "cgpa": cgpa}
+        except (IndexError, AttributeError):
+            return None
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching exam results: {e}")
+        return None
+
+
 @app.route("/sis", methods=["GET"])
 def get_student_data():
     usn = request.args.get("usn", "").strip()
@@ -681,6 +718,9 @@ def get_student_data():
             "courses": courses
         }
         prediction_results = predict_sgpa(prediction_data)
+        exam_result = fetch_exam_results(usn)
+        fetched_sgpa = exam_result.get("sgpa") if exam_result else "N/A"
+        fetched_cgpa = exam_result.get("cgpa") if exam_result else "N/A"
 
         # Build final data structure
         data = {
@@ -693,7 +733,9 @@ def get_student_data():
                 "cumulative": cumulative_data,
                 "semesters": semesters
             },
-            "predictions": prediction_results
+            "predictions": prediction_results,
+            "fetched_sgpa": fetched_sgpa,
+            "fetched_cgpa": fetched_cgpa
         }
 
         return jsonify(data), 200
@@ -702,6 +744,19 @@ def get_student_data():
         return jsonify({"error": f"Network or request error: {str(e)}"}), 502
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
+
+
+@app.route('/exam', methods=['GET'])
+def get_exam_results():
+    usn = request.args.get("usn", "").strip()
+    if not usn:
+        return jsonify({"error": "Missing usn parameter"}), 400
+
+    result = fetch_exam_results(usn)
+    if result:
+        return jsonify(result), 200
+    else:
+        return jsonify({"error": "Failed to fetch exam results"}), 500
 
 
 if __name__ == '__main__':
