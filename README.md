@@ -1,4 +1,4 @@
-# Reconnect MSRIT API 🔗
+# Reconnect MSRIT API (Parent Portal API)
 
 This project provides a serverless Flask API deployed on Vercel to help MSRIT students access their academic information. It fetches data from the college's portals and offers features like viewing CIE marks, attendance, academic history, and predicted SGPA based on different performance scenarios.
 
@@ -38,12 +38,12 @@ This project provides a serverless Flask API deployed on Vercel to help MSRIT st
 
     **Example `/sis` request:**
     ```bash
-    curl "https://your-vercel-app-url/sis?usn=1MS18CS001&dob=2000-01-01&endpoint=newparents"
+    curl "https://reconnect-msrit.vercel.app/sis?usn=1MS18CS001&dob=2000-01-01&endpoint=newparents"
     ```
 
     **Example `/exam` request:**
     ```bash
-    curl "https://your-vercel-app-url/exam?usn=1MS18CS001"
+    curl "https://reconnect-msrit.vercel.app/exam?usn=1MS18CS001"
     ```
 
 ## Files Included 📂
