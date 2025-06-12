@@ -510,7 +510,8 @@ def fetch_exam_results(usn):
         "osolCatchaTxt": "",
         "osolCatchaTxtInst": "0",
         "option": "com_examresult",
-        "task": "getResult"
+        "task": "getResult",
+        "examId": 57
     }
 
     headers = {
@@ -520,7 +521,7 @@ def fetch_exam_results(usn):
     }
 
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=10)
+        response = requests.post(url, data=payload, headers=headers, timeout=10, verify=False)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -574,7 +575,7 @@ def get_student_data():
     session = requests.Session()
 
     try:
-        login_response = session.post(login_url, data=login_data, timeout=10)
+        login_response = session.post(login_url, data=login_data, timeout=10, verify=False)
         if login_response.status_code != 200:
             return jsonify({"error": "Login failed. Check credentials or site availability."}), 500
 
@@ -582,7 +583,7 @@ def get_student_data():
             f"{base_url}/"
             "index.php?option=com_studentdashboard&controller=studentdashboard&task=dashboard"
         )
-        dashboard_response = session.get(dashboard_url, timeout=10)
+        dashboard_response = session.get(dashboard_url, timeout=10, verify=False)
         if dashboard_response.status_code != 200:
             return jsonify({"error": "Failed to retrieve dashboard. Possibly invalid credentials or site error."}), 500
 
@@ -638,7 +639,7 @@ def get_student_data():
         credit_mapping = {}
         if not fast:
             feedback_url = f"{base_url}/index.php?option=com_coursefeedback&controller=feedbackentry&task=feedback"
-            feedback_response = session.get(feedback_url, timeout=10)
+            feedback_response = session.get(feedback_url, timeout=10, verify=False)
             if feedback_response.status_code == 200:
                 feedback_soup = BeautifulSoup(feedback_response.text, "html.parser")
                 feedback_table = feedback_soup.find("table")
@@ -657,7 +658,7 @@ def get_student_data():
                             if not feedback_link.startswith("http"):
                                 feedback_link = f"{base_url}/" + feedback_link
 
-                            course_feedback_response = session.get(feedback_link, timeout=10)
+                            course_feedback_response = session.get(feedback_link, timeout=10, verify=False)
                             if course_feedback_response.status_code == 200:
                                 course_feedback_soup = BeautifulSoup(course_feedback_response.text, "html.parser")
                                 credit_div = course_feedback_soup.find("div",
@@ -783,4 +784,4 @@ def get_exam_results():
 
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=8000)
