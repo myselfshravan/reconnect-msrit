@@ -511,8 +511,11 @@ def fetch_exam_results(usn):
         "osolCatchaTxtInst": "0",
         "option": "com_examresult",
         "task": "getResult",
-        "examId": 57
     }
+    year = usn[3:5]
+    if year != "22":
+        payload["examId"] = 57
+    print(payload)
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
