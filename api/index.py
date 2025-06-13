@@ -786,38 +786,5 @@ def get_exam_results():
         return jsonify({"error": "Failed to fetch exam results"}), 500
 
 
-# Load the college data JSON once at startup
-with open("../college_exam_results.json", "r") as file:
-    college_data = json.load(file)
-
-# Flatten the data to make searching faster
-all_students = []
-for dept, students in college_data.items():
-    for s in students:
-        s["department"] = dept
-        all_students.append(s)
-
-
-@app.route("/search", methods=["GET"])
-def search_student():
-    usn = request.args.get("usn", "").strip().lower()
-    name = request.args.get("name", "").strip().lower()
-
-    if not usn and not name:
-        return jsonify({"error": "Please provide either 'usn' or 'name' as a query parameter."}), 400
-
-    matches = []
-    for student in all_students:
-        if usn and student["usn"].lower() == usn:
-            matches.append(student)
-        elif name and name in student["name"].lower():
-            matches.append(student)
-
-    if matches:
-        return jsonify(matches), 200
-    else:
-        return jsonify({"message": "No matching student found."}), 404
-
-
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=8000)
