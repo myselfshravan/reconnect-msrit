@@ -577,6 +577,10 @@ def get_student_data():
 
     session = requests.Session()
 
+    # Disable SSL verification warnings since we're using verify=False
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
     try:
         login_response = session.post(login_url, data=login_data, timeout=10, verify=False)
         if login_response.status_code != 200:
@@ -686,7 +690,7 @@ def get_student_data():
             last_updated = ""
 
         result_url = f"{base_url}/index.php?option=com_history&task=getResult"
-        result_response = session.get(result_url, timeout=10)
+        result_response = session.get(result_url, timeout=10, verify=False)
         cumulative_data = {}
         semesters = []
 
