@@ -747,7 +747,7 @@ def get_student_data():
             "courses": courses
         }
         exam_result = fetch_exam_results(usn)
-        fetched_sgpa = exam_result.get("sgpa") if exam_result else 8.0
+        fetched_sgpa = exam_result.get("sgpa") if exam_result else "N/A"
         prediction_results = predict_sgpa(prediction_data, actual_sgpa=fetched_sgpa)
         fetched_cgpa = exam_result.get("cgpa") if exam_result else "N/A"
         semester = exam_result.get("semester") if exam_result else "N/A"

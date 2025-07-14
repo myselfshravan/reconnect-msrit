@@ -12,3 +12,6 @@ venv/
 ENV/ 
 env.bak/ 
 venv.bak/ 
+dept_csvs/*
+raw_data/*
+csv_check.py
