@@ -328,7 +328,7 @@ def test():
         "usn": '1MS21AB001',
         "fetched_sgpa": "8.81",
         "fetched_cgpa": "8.67",
-        "semester": "Semister 7"
+        "semester": "Semester 7"
     }
     return jsonify(data), 200
 
@@ -735,7 +735,16 @@ def get_student_data():
         fetched_sgpa = exam_result.get("sgpa") if exam_result else "N/A"
         prediction_results = predict_sgpa(prediction_data)
         fetched_cgpa = exam_result.get("cgpa") if exam_result else "N/A"
-        semester = exam_result.get("semester") if exam_result else "N/A"
+        
+        # Calculate current semester based on academic history
+        # Count regular semesters (exclude Supplementary and Back-Log)
+        regular_semesters = [
+            sem for sem in semesters 
+            if "Supplementary" not in sem.get("semester", "") 
+            and "Back-Log" not in sem.get("semester", "")
+        ]
+        current_semester_num = len(regular_semesters) + 1
+        semester = f"Semester {current_semester_num}"
 
         # Build final data structure
         data = {
