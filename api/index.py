@@ -11,18 +11,46 @@ import json
 app = Flask(__name__)
 CORS(app)
 
+# Default endpoint configuration
+DEFAULT_ENDPOINT = "newparentseven"
+
 
 @app.route('/', methods=['GET'])
 def home():
     data = {
-        "url": "/sis",
-        "method": "GET",
-        "params": {
-            "usn": "1MS18CS001",
-            "dob": "2000-01-01",
-            "endpoint": "newparents, oddparents, evenparents"
-        },
-        "description": "Get student data from SIS",
+        "endpoints": {
+            "/sis": {
+                "method": "GET",
+                "params": {
+                    "usn": "1MS18CS001",
+                    "dob": "2000-01-01",
+                    "endpoint": "newparents, oddparents, evenparents, newparentseven, newparentsodd, default"
+                },
+                "description": "Get student data from SIS"
+            },
+            "/endpoints": {
+                "method": "GET",
+                "params": {},
+                "description": "Get list of active endpoints from https://parents.msrit.edu/webfiles/"
+            },
+            "/exam": {
+                "method": "GET",
+                "params": {
+                    "usn": "1MS18CS001"
+                },
+                "description": "Get exam results for a student"
+            },
+            "/health": {
+                "method": "GET",
+                "params": {},
+                "description": "Check API health status"
+            },
+            "/test": {
+                "method": "GET",
+                "params": {},
+                "description": "Get sample test data"
+            }
+        }
     }
     return jsonify(data), 200
 
@@ -534,6 +562,11 @@ def get_student_data():
     usn = request.args.get("usn", "").strip()
     dob = request.args.get("dob", "").strip()
     endpoint = request.args.get("endpoint", "").strip()
+
+    # Handle default endpoint
+    if endpoint.lower() == "default":
+        endpoint = DEFAULT_ENDPOINT
+
     base_url = f"https://parents.msrit.edu/{endpoint}"
     fast = request.args.get("fast", "false").lower() == "true"
 
@@ -735,13 +768,13 @@ def get_student_data():
         fetched_sgpa = exam_result.get("sgpa") if exam_result else "N/A"
         prediction_results = predict_sgpa(prediction_data)
         fetched_cgpa = exam_result.get("cgpa") if exam_result else "N/A"
-        
+
         # Calculate current semester based on academic history
         # Count regular semesters (exclude Supplementary and Back-Log)
         regular_semesters = [
-            sem for sem in semesters 
-            if "Supplementary" not in sem.get("semester", "") 
-            and "Back-Log" not in sem.get("semester", "")
+            sem for sem in semesters
+            if "Supplementary" not in sem.get("semester", "")
+               and "Back-Log" not in sem.get("semester", "")
         ]
         current_semester_num = len(regular_semesters) + 1
         semester = f"Semester {current_semester_num}"
@@ -782,6 +815,69 @@ def get_exam_results():
         return jsonify(result), 200
     else:
         return jsonify({"error": "Failed to fetch exam results"}), 500
+
+
+@app.route('/endpoints', methods=['GET'])
+def get_active_endpoints():
+    """
+    Fetch the list of active endpoints from https://parents.msrit.edu/webfiles/
+    """
+    try:
+        url = "https://parents.msrit.edu/webfiles/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/96.0.4664.45 Safari/537.36"
+        }
+        response = requests.get(url, headers=headers, timeout=10, verify=False)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, "html.parser")
+        endpoints = []
+        cards = soup.find_all("div", class_=lambda x: x and "uk-card" in x and "uk-card-default" in x)
+        for card in cards:
+            try:
+                title_element = card.find("h2", class_="uk-card-title")
+                if not title_element:
+                    continue
+                title = title_element.text.strip()
+                footer = card.find("div", class_="uk-card-footer")
+                if not footer:
+                    continue
+                link_element = footer.find("a", href=True)
+                if not link_element:
+                    continue
+
+                href = link_element.get("href", "")
+                endpoint_name = href.replace("../", "").rstrip("/")
+                if endpoint_name:
+                    endpoints.append({
+                        "name": endpoint_name,
+                        "title": title,
+                        "url": href
+                    })
+
+            except Exception as e:
+                print(f"Error parsing card: {e}")
+                continue
+
+        from datetime import datetime
+        return jsonify({
+            "active_endpoints": endpoints,
+            "count": len(endpoints),
+            "source_url": url,
+            "fetched_at": datetime.now().isoformat()
+        }), 200
+
+    except requests.exceptions.RequestException as e:
+        return jsonify({
+            "error": f"Failed to fetch endpoints from source: {str(e)}",
+            "source_url": "https://parents.msrit.edu/webfiles"
+        }), 502
+
+    except Exception as e:
+        return jsonify({
+            "error": f"An error occurred while processing endpoints: {str(e)}"
+        }), 500
 
 
 if __name__ == '__main__':
