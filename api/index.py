@@ -865,7 +865,8 @@ def get_active_endpoints():
             "active_endpoints": endpoints,
             "count": len(endpoints),
             "source_url": url,
-            "fetched_at": datetime.now().isoformat()
+            "fetched_at": datetime.now().isoformat(),
+            "current": DEFAULT_ENDPOINT
         }), 200
 
     except requests.exceptions.RequestException as e:
