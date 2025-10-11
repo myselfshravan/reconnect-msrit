@@ -12,7 +12,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Default endpoint configuration
-DEFAULT_ENDPOINT = "newparentseven"
+DEFAULT_ENDPOINT = "newparents"
 
 
 @app.route('/', methods=['GET'])
@@ -600,7 +600,7 @@ def get_student_data():
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     try:
-        login_response = session.post(login_url, data=login_data, timeout=10, verify=False)
+        login_response = session.post(login_url, data=login_data, timeout=30, verify=False)
         if login_response.status_code != 200:
             return jsonify({"error": "Login failed. Check credentials or site availability."}), 500
 
@@ -608,7 +608,7 @@ def get_student_data():
             f"{base_url}/"
             "index.php?option=com_studentdashboard&controller=studentdashboard&task=dashboard"
         )
-        dashboard_response = session.get(dashboard_url, timeout=10, verify=False)
+        dashboard_response = session.get(dashboard_url, timeout=30, verify=False)
         if dashboard_response.status_code != 200:
             return jsonify({"error": "Failed to retrieve dashboard. Possibly invalid credentials or site error."}), 500
 
