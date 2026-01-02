@@ -4,18 +4,50 @@ import requests
 from bs4 import BeautifulSoup
 import re
 from flask_cors import CORS
-import random
-import hashlib
-import json
 
 app = Flask(__name__)
+
+# Bright Data proxy - auto-rotates IPs on each request
+PROXY_URL = "http://brd-customer-hl_1383ee4e-zone-datacenter_proxy_sis:hrtnuotx6xks@brd.superproxy.io:33335"
+PROXIES = {"http": PROXY_URL, "https": PROXY_URL}
+MAX_RETRIES = 3
+
+
+def make_request(method, url, session=None, **kwargs):
+    """Make HTTP request with retries through Bright Data proxy."""
+    kwargs.setdefault("timeout", 30)
+    kwargs.setdefault("verify", False)
+    kwargs["proxies"] = PROXIES
+
+    requester = session if session else requests
+
+    for attempt in range(MAX_RETRIES):
+        try:
+            print(f"[Attempt {attempt + 1}/{MAX_RETRIES}] {method} {url}")
+            if method == "GET":
+                response = requester.get(url, **kwargs)
+            elif method == "POST":
+                response = requester.post(url, **kwargs)
+            else:
+                response = None
+            print(f"[Success] {method} {url} -> {response.status_code if response else 'None'}")
+            return response
+        except requests.exceptions.RequestException as e:
+            print(f"[Failed] Attempt {attempt + 1}/{MAX_RETRIES} for {url}: {str(e)[:100]}")
+            if attempt == MAX_RETRIES - 1:
+                print(f"[Giving up] All {MAX_RETRIES} attempts failed for {url}")
+                raise e
+            print("[Retrying] Will try again with new IP...")
+    return None
+
+
 CORS(app)
 
 # Default endpoint configuration
 DEFAULT_ENDPOINT = "newparents"
 
 
-@app.route('/', methods=['GET'])
+@app.route("/", methods=["GET"])
 def home():
     data = {
         "endpoints": {
@@ -24,38 +56,36 @@ def home():
                 "params": {
                     "usn": "1MS18CS001",
                     "dob": "2000-01-01",
-                    "endpoint": "newparents, oddparents, evenparents, newparentseven, newparentsodd, default"
+                    "endpoint": "newparents, oddparents, evenparents, newparentseven, newparentsodd, default",
                 },
-                "description": "Get student data from SIS"
+                "description": "Get student data from SIS",
             },
             "/endpoints": {
                 "method": "GET",
                 "params": {},
-                "description": "Get list of active endpoints from https://parents.msrit.edu/webfiles/"
+                "description": "Get list of active endpoints from https://parents.msrit.edu/webfiles/",
             },
             "/exam": {
                 "method": "GET",
-                "params": {
-                    "usn": "1MS18CS001"
-                },
-                "description": "Get exam results for a student"
+                "params": {"usn": "1MS18CS001"},
+                "description": "Get exam results for a student",
             },
             "/health": {
                 "method": "GET",
                 "params": {},
-                "description": "Check API health status"
+                "description": "Check API health status",
             },
             "/test": {
                 "method": "GET",
                 "params": {},
-                "description": "Get sample test data"
-            }
+                "description": "Get sample test data",
+            },
         }
     }
     return jsonify(data), 200
 
 
-@app.route('/test', methods=['GET'])
+@app.route("/test", methods=["GET"])
 def test():
     data = {
         "courses": [
@@ -64,49 +94,49 @@ def test():
                 "CourseName": "Multicore Architecture and programming",
                 "InternalScore": 48,
                 "attendance": 88,
-                "credit": 4
+                "credit": 4,
             },
             {
                 "CourseCode": "CI72",
                 "CourseName": "Foundations of Computer Vision",
                 "InternalScore": 47,
                 "attendance": 86,
-                "credit": 3
+                "credit": 3,
             },
             {
                 "CourseCode": "CIL74",
                 "CourseName": "Containerization Laboratory",
                 "InternalScore": 46,
                 "attendance": 90,
-                "credit": 1
+                "credit": 1,
             },
             {
                 "CourseCode": "CIL75",
                 "CourseName": "Skill Enhancement Lab -Generative AI",
                 "InternalScore": 45,
                 "attendance": 86,
-                "credit": 3
+                "credit": 3,
             },
             {
                 "CourseCode": "CIE731",
                 "CourseName": "Information Retrieval",
                 "InternalScore": 44,
                 "attendance": 76,
-                "credit": 3
+                "credit": 3,
             },
             {
                 "CourseCode": "ETOE02",
                 "CourseName": "Wireless Sensor Networks",
                 "InternalScore": 43,
                 "attendance": 78,
-                "credit": 3
-            }
+                "credit": 3,
+            },
         ],
         "academicHistory": {
             "cumulative": {
                 "cgpa": "9.99",
                 "creditsEarned": "126",
-                "creditsToBeEarned": "34"
+                "creditsToBeEarned": "34",
             },
             "semesters": [
                 {
@@ -114,44 +144,44 @@ def test():
                     "creditsEarned": "20",
                     "creditsRegistered": "20",
                     "semester": "Feb / Mar 2022",
-                    "sgpa": "8.75"
+                    "sgpa": "8.75",
                 },
                 {
                     "cgpa": "8.77",
                     "creditsEarned": "16",
                     "creditsRegistered": "20",
                     "semester": "July 2022",
-                    "sgpa": "7.05"
+                    "sgpa": "7.05",
                 },
                 {
                     "cgpa": "8.59",
                     "creditsEarned": "21",
                     "creditsRegistered": "21",
                     "semester": "Jan 2023",
-                    "sgpa": "8.28"
+                    "sgpa": "8.28",
                 },
                 {
                     "cgpa": "8.72",
                     "creditsEarned": "22",
                     "creditsRegistered": "22",
                     "semester": "May/June 2023",
-                    "sgpa": "9.04"
+                    "sgpa": "9.04",
                 },
                 {
                     "cgpa": "8.69",
                     "creditsEarned": "21",
                     "creditsRegistered": "21",
                     "semester": "ODD - December 2023",
-                    "sgpa": "8.71"
+                    "sgpa": "8.71",
                 },
                 {
                     "cgpa": "8.80",
                     "creditsEarned": "22",
                     "creditsRegistered": "22",
                     "semester": "EVEN - May 2024",
-                    "sgpa": "9.31"
-                }
-            ]
+                    "sgpa": "9.31",
+                },
+            ],
         },
         "predictions": {
             "atleast": {
@@ -164,7 +194,7 @@ def test():
                         "InternalScore_out_of_50": 48,
                         "LetterGrade": "A+",
                         "PredictedFinal_out_of_100": 72.6,
-                        "Total_out_of_100": 84.3
+                        "Total_out_of_100": 84.3,
                     },
                     {
                         "CourseCode": "CI72",
@@ -174,7 +204,7 @@ def test():
                         "InternalScore_out_of_50": 37,
                         "LetterGrade": "B+",
                         "PredictedFinal_out_of_100": 62.6,
-                        "Total_out_of_100": 68.3
+                        "Total_out_of_100": 68.3,
                     },
                     {
                         "CourseCode": "CIL74",
@@ -184,7 +214,7 @@ def test():
                         "InternalScore_out_of_50": 50,
                         "LetterGrade": "A+",
                         "PredictedFinal_out_of_100": 73.5,
-                        "Total_out_of_100": 86.7
+                        "Total_out_of_100": 86.7,
                     },
                     {
                         "CourseCode": "CIL75",
@@ -194,7 +224,7 @@ def test():
                         "InternalScore_out_of_50": 48,
                         "LetterGrade": "A+",
                         "PredictedFinal_out_of_100": 72.6,
-                        "Total_out_of_100": 84.3
+                        "Total_out_of_100": 84.3,
                     },
                     {
                         "CourseCode": "CIE731",
@@ -204,7 +234,7 @@ def test():
                         "InternalScore_out_of_50": 31,
                         "LetterGrade": "B",
                         "PredictedFinal_out_of_100": 52.7,
-                        "Total_out_of_100": 57.3
+                        "Total_out_of_100": 57.3,
                     },
                     {
                         "CourseCode": "ETOE02",
@@ -214,10 +244,10 @@ def test():
                         "InternalScore_out_of_50": 40,
                         "LetterGrade": "A",
                         "PredictedFinal_out_of_100": 66.5,
-                        "Total_out_of_100": 73.2
-                    }
+                        "Total_out_of_100": 73.2,
+                    },
                 ],
-                "predicted_sgpa": 7.94
+                "predicted_sgpa": 7.94,
             },
             "maxeffort": {
                 "course_details": [
@@ -229,7 +259,7 @@ def test():
                         "InternalScore_out_of_50": 48,
                         "LetterGrade": "O",
                         "PredictedFinal_out_of_100": 98.3,
-                        "Total_out_of_100": 97.1
+                        "Total_out_of_100": 97.1,
                     },
                     {
                         "CourseCode": "CI72",
@@ -239,7 +269,7 @@ def test():
                         "InternalScore_out_of_50": 37,
                         "LetterGrade": "A",
                         "PredictedFinal_out_of_100": 84.7,
-                        "Total_out_of_100": 79.4
+                        "Total_out_of_100": 79.4,
                     },
                     {
                         "CourseCode": "CIL74",
@@ -249,7 +279,7 @@ def test():
                         "InternalScore_out_of_50": 50,
                         "LetterGrade": "O",
                         "PredictedFinal_out_of_100": 99.4,
-                        "Total_out_of_100": 99.7
+                        "Total_out_of_100": 99.7,
                     },
                     {
                         "CourseCode": "CIL75",
@@ -259,7 +289,7 @@ def test():
                         "InternalScore_out_of_50": 48,
                         "LetterGrade": "O",
                         "PredictedFinal_out_of_100": 98.3,
-                        "Total_out_of_100": 97.1
+                        "Total_out_of_100": 97.1,
                     },
                     {
                         "CourseCode": "CIE731",
@@ -269,7 +299,7 @@ def test():
                         "InternalScore_out_of_50": 31,
                         "LetterGrade": "B+",
                         "PredictedFinal_out_of_100": 71.3,
-                        "Total_out_of_100": 66.7
+                        "Total_out_of_100": 66.7,
                     },
                     {
                         "CourseCode": "ETOE02",
@@ -279,10 +309,10 @@ def test():
                         "InternalScore_out_of_50": 40,
                         "LetterGrade": "A+",
                         "PredictedFinal_out_of_100": 89.9,
-                        "Total_out_of_100": 85
-                    }
+                        "Total_out_of_100": 85,
+                    },
                 ],
-                "predicted_sgpa": 8.94
+                "predicted_sgpa": 8.94,
             },
             "mostlikely": {
                 "course_details": [
@@ -294,7 +324,7 @@ def test():
                         "InternalScore_out_of_50": 48,
                         "LetterGrade": "O",
                         "PredictedFinal_out_of_100": 85.5,
-                        "Total_out_of_100": 90.7
+                        "Total_out_of_100": 90.7,
                     },
                     {
                         "CourseCode": "CI72",
@@ -304,7 +334,7 @@ def test():
                         "InternalScore_out_of_50": 37,
                         "LetterGrade": "A",
                         "PredictedFinal_out_of_100": 73.7,
-                        "Total_out_of_100": 73.8
+                        "Total_out_of_100": 73.8,
                     },
                     {
                         "CourseCode": "CIL74",
@@ -314,7 +344,7 @@ def test():
                         "InternalScore_out_of_50": 50,
                         "LetterGrade": "O",
                         "PredictedFinal_out_of_100": 86.5,
-                        "Total_out_of_100": 93.2
+                        "Total_out_of_100": 93.2,
                     },
                     {
                         "CourseCode": "CIL75",
@@ -324,7 +354,7 @@ def test():
                         "InternalScore_out_of_50": 48,
                         "LetterGrade": "O",
                         "PredictedFinal_out_of_100": 85.5,
-                        "Total_out_of_100": 90.7
+                        "Total_out_of_100": 90.7,
                     },
                     {
                         "CourseCode": "CIE731",
@@ -334,7 +364,7 @@ def test():
                         "InternalScore_out_of_50": 31,
                         "LetterGrade": "B+",
                         "PredictedFinal_out_of_100": 62,
-                        "Total_out_of_100": 62
+                        "Total_out_of_100": 62,
                     },
                     {
                         "CourseCode": "ETOE02",
@@ -344,38 +374,59 @@ def test():
                         "InternalScore_out_of_50": 40,
                         "LetterGrade": "A",
                         "PredictedFinal_out_of_100": 78.2,
-                        "Total_out_of_100": 79.1
-                    }
+                        "Total_out_of_100": 79.1,
+                    },
                 ],
-                "predicted_sgpa": 8.76
-            }
+                "predicted_sgpa": 8.76,
+            },
         },
         "cgpa": "9.99",
-        "lastUpdated": '11/02/2025',
-        "name": 'TEST USER',
-        "usn": '1MS21AB001',
+        "lastUpdated": "11/02/2025",
+        "name": "TEST USER",
+        "usn": "1MS21AB001",
         "fetched_sgpa": "8.81",
         "fetched_cgpa": "8.67",
-        "semester": "Semester 7"
+        "semester": "Semester 7",
     }
     return jsonify(data), 200
 
 
-@app.route('/health', methods=['GET'])
-def handle_get():
-    data = {
-        "message": "API is up and running"
-    }
-    return jsonify(data), 200
+@app.route("/health", methods=["GET"])
+def health_check():
+    """Health check with optional upstream connectivity test."""
+    full = request.args.get("full", "false").lower() == "true"
+
+    result = {"status": "healthy", "api": "up"}
+
+    if full:
+        import urllib3
+
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        # Test parents.msrit.edu
+        try:
+            r = make_request("GET", "https://parents.msrit.edu/", timeout=20)
+            result["parents_msrit"] = {"status": "up", "code": r.status_code}
+        except Exception as e:
+            result["parents_msrit"] = {"status": "down", "error": str(e)}
+
+        # Test exam.msrit.edu
+        try:
+            r = make_request("GET", "https://exam.msrit.edu/", timeout=20)
+            result["exam_msrit"] = {"status": "up", "code": r.status_code}
+        except Exception as e:
+            result["exam_msrit"] = {"status": "down", "error": str(e)}
+
+    return jsonify(result), 200
 
 
-@app.route('/status', methods=['POST'])
+@app.route("/status", methods=["POST"])
 def handle_post():
     request_data = request.json
     response_data = {
         "message": "API is up and running",
         "data": request_data.get("data", "No data provided"),
-        "status": request_data.get("status", "No status provided")
+        "status": request_data.get("status", "No status provided"),
     }
     return jsonify(response_data), 200
 
@@ -390,7 +441,7 @@ def predict_final_score(internal_score, scenario="mostlikely"):
     scenario_multipliers = {
         "atleast": 0.85,  # Conservative
         "mostlikely": 1.0,  # Expected
-        "maxeffort": 1.15  # Best-case
+        "maxeffort": 1.15,  # Best-case
     }
 
     # Base projection: double the internal (since internal is out of 50)
@@ -428,7 +479,7 @@ def letter_grade_from_100(score_out_of_100):
         ("B+", 60),
         ("B", 55),
         ("C", 50),
-        ("P", 40)
+        ("P", 40),
     ]
     for grade, cutoff in thresholds:
         if score_out_of_100 >= cutoff:
@@ -440,16 +491,7 @@ def letter_grade_to_point(letter):
     """
     Map each letter grade to numeric grade–points.
     """
-    mapping = {
-        "O": 10,
-        "A+": 9,
-        "A": 8,
-        "B+": 7,
-        "B": 6,
-        "C": 5,
-        "P": 4,
-        "F": 0
-    }
+    mapping = {"O": 10, "A+": 9, "A": 8, "B+": 7, "B": 6, "C": 5, "P": 4, "F": 0}
     return mapping.get(letter, 0)
 
 
@@ -494,23 +536,25 @@ def predict_sgpa(data):
             total_score_100 = calculate_total_score(internal_score, predicted_final)
             letter_grade = letter_grade_from_100(total_score_100)
             grade_points = letter_grade_to_point(letter_grade)
-            scenario_total_gp += (grade_points * credit)
+            scenario_total_gp += grade_points * credit
 
-            course_details.append({
-                "CourseCode": course_code,
-                "CourseName": course_name,
-                "InternalScore_out_of_50": internal_score,
-                "PredictedFinal_out_of_100": round(predicted_final, 1),
-                "Total_out_of_100": round(total_score_100, 1),
-                "LetterGrade": letter_grade,
-                "GradePoints": grade_points,
-                "Credit": credit
-            })
+            course_details.append(
+                {
+                    "CourseCode": course_code,
+                    "CourseName": course_name,
+                    "InternalScore_out_of_50": internal_score,
+                    "PredictedFinal_out_of_100": round(predicted_final, 1),
+                    "Total_out_of_100": round(total_score_100, 1),
+                    "LetterGrade": letter_grade,
+                    "GradePoints": grade_points,
+                    "Credit": credit,
+                }
+            )
 
         scenario_sgpa = scenario_total_gp / total_credits
         results[scenario] = {
             "predicted_sgpa": round(scenario_sgpa, 2),
-            "course_details": course_details
+            "course_details": course_details,
         }
 
     return results
@@ -532,12 +576,12 @@ def fetch_exam_results(usn):
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                      "AppleWebKit/537.36 (KHTML, like Gecko) "
-                      "Chrome/96.0.4664.45 Safari/537.36"
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/96.0.4664.45 Safari/537.36"
     }
 
     try:
-        response = requests.post(url, data=payload, headers=headers, timeout=10, verify=False)
+        response = make_request("POST", url, data=payload, headers=headers, timeout=10)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
 
@@ -569,6 +613,7 @@ def get_student_data():
 
     base_url = f"https://parents.msrit.edu/{endpoint}"
     fast = request.args.get("fast", "false").lower() == "true"
+    debug = request.args.get("debug", "false").lower() == "true"
 
     if not usn or not dob:
         return jsonify({"error": "Missing usn or dob parameter"}), 400
@@ -590,43 +635,82 @@ def get_student_data():
         "option": "com_user",
         "task": "login",
         "return": "",
-        "958d8408014b5d49cad60943434949ff": "1"
+        "958d8408014b5d49cad60943434949ff": "1",
     }
 
     session = requests.Session()
+    session.proxies.update(PROXIES)
 
     # Disable SSL verification warnings since we're using verify=False
     import urllib3
+
     urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     try:
-        login_response = session.post(login_url, data=login_data, timeout=30, verify=False)
+        try:
+            login_response = session.post(
+                login_url, data=login_data, timeout=30, verify=False
+            )
+        except requests.exceptions.RequestException as e:
+            return jsonify(
+                {
+                    "error": "Login request failed",
+                    "step": "login",
+                    "details": str(e) if debug else None,
+                }
+            ), 502
+
         if login_response.status_code != 200:
-            return jsonify({"error": "Login failed. Check credentials or site availability."}), 500
+            return jsonify(
+                {"error": "Login failed. Check credentials or site availability."}
+            ), 500
 
         dashboard_url = (
             f"{base_url}/"
             "index.php?option=com_studentdashboard&controller=studentdashboard&task=dashboard"
         )
-        dashboard_response = session.get(dashboard_url, timeout=30, verify=False)
+        try:
+            dashboard_response = session.get(dashboard_url, timeout=30, verify=False)
+        except requests.exceptions.RequestException as e:
+            return jsonify(
+                {
+                    "error": "Dashboard request failed",
+                    "step": "dashboard",
+                    "details": str(e) if debug else None,
+                }
+            ), 502
+
         if dashboard_response.status_code != 200:
-            return jsonify({"error": "Failed to retrieve dashboard. Possibly invalid credentials or site error."}), 500
+            return jsonify(
+                {
+                    "error": "Failed to retrieve dashboard. Possibly invalid credentials or site error."
+                }
+            ), 500
 
         soup = BeautifulSoup(dashboard_response.text, "html.parser")
 
         try:
-            student_name = soup.find("div", class_="cn-stu-data") \
-                .find("h3").text.strip()
+            student_name = (
+                soup.find("div", class_="cn-stu-data").find("h3").text.strip()
+            )
         except AttributeError:
-            return jsonify({"error": "Could not retrieve student name. Possibly incorrect DOB/USN."}), 404
+            return jsonify(
+                {
+                    "error": "Could not retrieve student name. Possibly incorrect DOB/USN."
+                }
+            ), 404
 
         try:
             student_id_divs = soup.find_all("div", class_="cn-stu-data1")
             student_id = student_id_divs[1].find("h2").text.strip()
         except (IndexError, AttributeError):
-            return jsonify({"error": "Could not retrieve student ID. Possibly incorrect DOB/USN."}), 404
+            return jsonify(
+                {"error": "Could not retrieve student ID. Possibly incorrect DOB/USN."}
+            ), 404
 
-        script_tag = soup.find("script", string=lambda text: "columns" in text if text else False)
+        script_tag = soup.find(
+            "script", string=lambda text: "columns" in text if text else False
+        )
         if not script_tag:
             return jsonify({"error": "Could not find CIE marks script tag."}), 404
 
@@ -654,18 +738,32 @@ def get_student_data():
 
                 cie_score = cie_dict.get(course_code, "N/A")
 
-                courses.append({
-                    "CourseCode": course_code,
-                    "CourseName": course_name,
-                    "InternalScore": cie_score,
-                    "attendance": attendance,
-                })
+                courses.append(
+                    {
+                        "CourseCode": course_code,
+                        "CourseName": course_name,
+                        "InternalScore": cie_score,
+                        "attendance": attendance,
+                    }
+                )
 
         credit_mapping = {}
         if not fast:
             feedback_url = f"{base_url}/index.php?option=com_coursefeedback&controller=feedbackentry&task=feedback"
-            feedback_response = session.get(feedback_url, timeout=10, verify=False)
-            if feedback_response.status_code == 200:
+            try:
+                feedback_response = session.get(feedback_url, timeout=20, verify=False)
+            except requests.exceptions.RequestException as e:
+                if debug:
+                    return jsonify(
+                        {
+                            "error": "Feedback request failed",
+                            "step": "feedback",
+                            "details": str(e),
+                        }
+                    ), 502
+                feedback_response = None
+
+            if feedback_response and feedback_response.status_code == 200:
                 feedback_soup = BeautifulSoup(feedback_response.text, "html.parser")
                 feedback_table = feedback_soup.find("table")
                 if feedback_table:
@@ -683,11 +781,20 @@ def get_student_data():
                             if not feedback_link.startswith("http"):
                                 feedback_link = f"{base_url}/" + feedback_link
 
-                            course_feedback_response = session.get(feedback_link, timeout=10, verify=False)
+                            try:
+                                course_feedback_response = session.get(
+                                    feedback_link, timeout=20, verify=False
+                                )
+                            except requests.exceptions.RequestException:
+                                continue  # Skip this course's credit on failure
+
                             if course_feedback_response.status_code == 200:
-                                course_feedback_soup = BeautifulSoup(course_feedback_response.text, "html.parser")
-                                credit_div = course_feedback_soup.find("div",
-                                                                       style=lambda s: s and "font-size:35px" in s)
+                                course_feedback_soup = BeautifulSoup(
+                                    course_feedback_response.text, "html.parser"
+                                )
+                                credit_div = course_feedback_soup.find(
+                                    "div", style=lambda s: s and "font-size:35px" in s
+                                )
                                 if credit_div:
                                     credit_value = credit_div.text.strip()
                                     credit_mapping[course_code_fb] = credit_value
@@ -708,7 +815,17 @@ def get_student_data():
             last_updated = ""
 
         result_url = f"{base_url}/index.php?option=com_history&task=getResult"
-        result_response = session.get(result_url, timeout=10, verify=False)
+        try:
+            result_response = session.get(result_url, timeout=20, verify=False)
+        except requests.exceptions.RequestException as e:
+            return jsonify(
+                {
+                    "error": "Academic history request failed",
+                    "step": "history",
+                    "details": str(e) if debug else None,
+                }
+            ), 502
+
         cumulative_data = {}
         semesters = []
 
@@ -720,8 +837,12 @@ def get_student_data():
             if cumulative_div:
                 cards = cumulative_div.find_all("div", class_="uk-card")
                 for card in cards:
-                    header = card.find("h3").get_text(strip=True) if card.find("h3") else ""
-                    value = card.find("p").get_text(strip=True) if card.find("p") else ""
+                    header = (
+                        card.find("h3").get_text(strip=True) if card.find("h3") else ""
+                    )
+                    value = (
+                        card.find("p").get_text(strip=True) if card.find("p") else ""
+                    )
                     if "Credits Earned" in header:
                         cumulative_data["creditsEarned"] = value
                     elif "Credits to be" in header:
@@ -749,21 +870,21 @@ def get_student_data():
                     elif "CGPA" in span_text:
                         cgpa = extract_number(span_text)
                 if semester_name:
-                    semesters.append({
-                        "semester": semester_name,
-                        "creditsRegistered": registered,
-                        "creditsEarned": earned,
-                        "sgpa": sgpa,
-                        "cgpa": cgpa,
-                    })
+                    semesters.append(
+                        {
+                            "semester": semester_name,
+                            "creditsRegistered": registered,
+                            "creditsEarned": earned,
+                            "sgpa": sgpa,
+                            "cgpa": cgpa,
+                        }
+                    )
         # -------------------------------
         # Start the prediction
         # -------------------------------
 
         # Predict SGPA for three scenarios
-        prediction_data = {
-            "courses": courses
-        }
+        prediction_data = {"courses": courses}
         exam_result = fetch_exam_results(usn)
         fetched_sgpa = exam_result.get("sgpa") if exam_result else "N/A"
         prediction_results = predict_sgpa(prediction_data)
@@ -772,9 +893,10 @@ def get_student_data():
         # Calculate current semester based on academic history
         # Count regular semesters (exclude Supplementary and Back-Log)
         regular_semesters = [
-            sem for sem in semesters
+            sem
+            for sem in semesters
             if "Supplementary" not in sem.get("semester", "")
-               and "Back-Log" not in sem.get("semester", "")
+            and "Back-Log" not in sem.get("semester", "")
         ]
         current_semester_num = len(regular_semesters) + 1
         semester = f"Semester {current_semester_num}"
@@ -786,25 +908,20 @@ def get_student_data():
             "courses": courses,
             "lastUpdated": last_updated,
             "cgpa": cumulative_data.get("cgpa"),
-            "academicHistory": {
-                "cumulative": cumulative_data,
-                "semesters": semesters
-            },
+            "academicHistory": {"cumulative": cumulative_data, "semesters": semesters},
             "predictions": prediction_results,
             "fetched_sgpa": fetched_sgpa,
             "fetched_cgpa": fetched_cgpa,
-            "semester": semester
+            "semester": semester,
         }
 
         return jsonify(data), 200
 
-    except requests.exceptions.RequestException as e:
-        return jsonify({"error": f"Network or request error: {str(e)}"}), 502
     except Exception as e:
         return jsonify({"error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
-@app.route('/exam', methods=['GET'])
+@app.route("/exam", methods=["GET"])
 def get_exam_results():
     usn = request.args.get("usn", "").strip()
     if not usn:
@@ -817,7 +934,7 @@ def get_exam_results():
         return jsonify({"error": "Failed to fetch exam results"}), 500
 
 
-@app.route('/endpoints', methods=['GET'])
+@app.route("/endpoints", methods=["GET"])
 def get_active_endpoints():
     """
     Fetch the list of active endpoints from https://parents.msrit.edu/webfiles/
@@ -826,14 +943,16 @@ def get_active_endpoints():
         url = "https://parents.msrit.edu/webfiles/"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/96.0.4664.45 Safari/537.36"
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/96.0.4664.45 Safari/537.36"
         }
-        response = requests.get(url, headers=headers, timeout=10, verify=False)
+        response = make_request("GET", url, headers=headers, timeout=20)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, "html.parser")
         endpoints = []
-        cards = soup.find_all("div", class_=lambda x: x and "uk-card" in x and "uk-card-default" in x)
+        cards = soup.find_all(
+            "div", class_=lambda x: x and "uk-card" in x and "uk-card-default" in x
+        )
         for card in cards:
             try:
                 title_element = card.find("h2", class_="uk-card-title")
@@ -850,36 +969,39 @@ def get_active_endpoints():
                 href = link_element.get("href", "")
                 endpoint_name = href.replace("../", "").rstrip("/")
                 if endpoint_name:
-                    endpoints.append({
-                        "name": endpoint_name,
-                        "title": title,
-                        "url": href
-                    })
+                    endpoints.append(
+                        {"name": endpoint_name, "title": title, "url": href}
+                    )
 
             except Exception as e:
                 print(f"Error parsing card: {e}")
                 continue
 
         from datetime import datetime
-        return jsonify({
-            "active_endpoints": endpoints,
-            "count": len(endpoints),
-            "source_url": url,
-            "fetched_at": datetime.now().isoformat(),
-            "current": DEFAULT_ENDPOINT
-        }), 200
+
+        return jsonify(
+            {
+                "active_endpoints": endpoints,
+                "count": len(endpoints),
+                "source_url": url,
+                "fetched_at": datetime.now().isoformat(),
+                "current": DEFAULT_ENDPOINT,
+            }
+        ), 200
 
     except requests.exceptions.RequestException as e:
-        return jsonify({
-            "error": f"Failed to fetch endpoints from source: {str(e)}",
-            "source_url": "https://parents.msrit.edu/webfiles"
-        }), 502
+        return jsonify(
+            {
+                "error": f"Failed to fetch endpoints from source: {str(e)}",
+                "source_url": "https://parents.msrit.edu/webfiles",
+            }
+        ), 502
 
     except Exception as e:
-        return jsonify({
-            "error": f"An error occurred while processing endpoints: {str(e)}"
-        }), 500
+        return jsonify(
+            {"error": f"An error occurred while processing endpoints: {str(e)}"}
+        ), 500
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=8000)
+if __name__ == "__main__":
+    app.run(debug=True, host="0.0.0.0", port=8000)
