@@ -16,6 +16,7 @@ app = Flask(__name__)
 PROXY_URL = "http://brd-customer-hl_1383ee4e-zone-datacenter_proxy_sis:hrtnuotx6xks@brd.superproxy.io:33335"
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL}
 MAX_RETRIES = 5
+RETRY_DELAY = 0.5  # seconds
 
 
 def make_request(method, url, session=None, **kwargs):
