@@ -1,16 +1,21 @@
 import math
+import time
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 import re
 from flask_cors import CORS
+import urllib3
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 
 app = Flask(__name__)
 
 # Bright Data proxy - auto-rotates IPs on each request
 PROXY_URL = "http://brd-customer-hl_1383ee4e-zone-datacenter_proxy_sis:hrtnuotx6xks@brd.superproxy.io:33335"
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL}
-MAX_RETRIES = 3
+MAX_RETRIES = 5
 
 
 def make_request(method, url, session=None, **kwargs):
@@ -19,25 +24,36 @@ def make_request(method, url, session=None, **kwargs):
     kwargs.setdefault("verify", False)
     kwargs["proxies"] = PROXIES
 
-    requester = session if session else requests
-
     for attempt in range(MAX_RETRIES):
         try:
             print(f"[Attempt {attempt + 1}/{MAX_RETRIES}] {method} {url}")
+            # Create fresh session for each attempt to get new proxy IP
+            if session:
+                requester = session
+            else:
+                requester = requests.Session()
+                requester.proxies.update(PROXIES)
+
             if method == "GET":
                 response = requester.get(url, **kwargs)
             elif method == "POST":
                 response = requester.post(url, **kwargs)
             else:
                 response = None
-            print(f"[Success] {method} {url} -> {response.status_code if response else 'None'}")
+
+            print(
+                f"[Success] {method} {url} -> {response.status_code if response else 'None'}"
+            )
             return response
         except requests.exceptions.RequestException as e:
-            print(f"[Failed] Attempt {attempt + 1}/{MAX_RETRIES} for {url}: {str(e)[:100]}")
+            print(
+                f"[Failed] Attempt {attempt + 1}/{MAX_RETRIES} for {url}: {str(e)[:100]}"
+            )
             if attempt == MAX_RETRIES - 1:
                 print(f"[Giving up] All {MAX_RETRIES} attempts failed for {url}")
                 raise e
-            print("[Retrying] Will try again with new IP...")
+            print("[Retrying] Waiting 1s before retry with new IP...")
+            time.sleep(1)
     return None
 
 
@@ -399,10 +415,6 @@ def health_check():
     result = {"status": "healthy", "api": "up"}
 
     if full:
-        import urllib3
-
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
         # Test parents.msrit.edu
         try:
             r = make_request("GET", "https://parents.msrit.edu/", timeout=20)
@@ -638,20 +650,26 @@ def get_student_data():
         "958d8408014b5d49cad60943434949ff": "1",
     }
 
-    session = requests.Session()
-    session.proxies.update(PROXIES)
-
-    # Disable SSL verification warnings since we're using verify=False
-    import urllib3
-
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
-    try:
+    # Retry the entire session flow if proxy fails
+    for attempt in range(MAX_RETRIES):
         try:
+            print(f"[SIS Attempt {attempt + 1}/{MAX_RETRIES}] Starting login flow...")
+
+            # Fresh session for each attempt
+            session = requests.Session()
+            session.proxies.update(PROXIES)
+
             login_response = session.post(
                 login_url, data=login_data, timeout=30, verify=False
             )
+            print(f"[SIS] Login response: {login_response.status_code}")
+            break  # Success, exit retry loop
         except requests.exceptions.RequestException as e:
+            print(f"[SIS Failed] Attempt {attempt + 1}/{MAX_RETRIES}: {str(e)[:100]}")
+            if attempt < MAX_RETRIES - 1:
+                print("[SIS Retrying] Waiting 1s...")
+                time.sleep(1)
+                continue
             return jsonify(
                 {
                     "error": "Login request failed",
@@ -660,6 +678,7 @@ def get_student_data():
                 }
             ), 502
 
+    try:
         if login_response.status_code != 200:
             return jsonify(
                 {"error": "Login failed. Check credentials or site availability."}
@@ -670,7 +689,7 @@ def get_student_data():
             "index.php?option=com_studentdashboard&controller=studentdashboard&task=dashboard"
         )
         try:
-            dashboard_response = session.get(dashboard_url, timeout=30, verify=False)
+            dashboard_response = make_request("GET", dashboard_url, session=session, timeout=30)
         except requests.exceptions.RequestException as e:
             return jsonify(
                 {
@@ -751,7 +770,7 @@ def get_student_data():
         if not fast:
             feedback_url = f"{base_url}/index.php?option=com_coursefeedback&controller=feedbackentry&task=feedback"
             try:
-                feedback_response = session.get(feedback_url, timeout=20, verify=False)
+                feedback_response = make_request("GET", feedback_url, session=session, timeout=20)
             except requests.exceptions.RequestException as e:
                 if debug:
                     return jsonify(
@@ -782,8 +801,8 @@ def get_student_data():
                                 feedback_link = f"{base_url}/" + feedback_link
 
                             try:
-                                course_feedback_response = session.get(
-                                    feedback_link, timeout=20, verify=False
+                                course_feedback_response = make_request(
+                                    "GET", feedback_link, session=session, timeout=20
                                 )
                             except requests.exceptions.RequestException:
                                 continue  # Skip this course's credit on failure
@@ -816,7 +835,7 @@ def get_student_data():
 
         result_url = f"{base_url}/index.php?option=com_history&task=getResult"
         try:
-            result_response = session.get(result_url, timeout=20, verify=False)
+            result_response = make_request("GET", result_url, session=session, timeout=20)
         except requests.exceptions.RequestException as e:
             return jsonify(
                 {
