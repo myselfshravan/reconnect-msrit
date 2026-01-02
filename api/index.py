@@ -53,8 +53,8 @@ def make_request(method, url, session=None, **kwargs):
             if attempt == MAX_RETRIES - 1:
                 print(f"[Giving up] All {MAX_RETRIES} attempts failed for {url}")
                 raise e
-            print("[Retrying] Waiting 1s before retry with new IP...")
-            time.sleep(1)
+            print(f"[Retrying] Waiting {RETRY_DELAY}s before retry...")
+            time.sleep(RETRY_DELAY)
     return None
 
 
@@ -668,8 +668,8 @@ def get_student_data():
         except requests.exceptions.RequestException as e:
             print(f"[SIS Failed] Attempt {attempt + 1}/{MAX_RETRIES}: {str(e)[:100]}")
             if attempt < MAX_RETRIES - 1:
-                print("[SIS Retrying] Waiting 1s...")
-                time.sleep(1)
+                print(f"[SIS Retrying] Waiting {RETRY_DELAY}s...")
+                time.sleep(RETRY_DELAY)
                 continue
             return jsonify(
                 {
