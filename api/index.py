@@ -1,5 +1,6 @@
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
@@ -17,6 +18,7 @@ PROXY_URL = "http://brd-customer-hl_1383ee4e-zone-datacenter_proxy_sis:hrtnuotx6
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL}
 MAX_RETRIES = 5
 RETRY_DELAY = 0.5  # seconds
+MAX_CONCURRENT_FEEDBACK = 4
 
 
 def make_request(method, url, session=None, **kwargs):
@@ -786,6 +788,7 @@ def get_student_data():
             if feedback_response and feedback_response.status_code == 200:
                 feedback_soup = BeautifulSoup(feedback_response.text, "html.parser")
                 feedback_table = feedback_soup.find("table")
+                feedback_links = []
                 if feedback_table:
                     tbody = feedback_table.find("tbody")
                     if tbody:
@@ -800,24 +803,48 @@ def get_student_data():
                             feedback_link = a_tag["href"]
                             if not feedback_link.startswith("http"):
                                 feedback_link = f"{base_url}/" + feedback_link
+                            feedback_links.append((course_code_fb, feedback_link))
 
+                if feedback_links:
+                    login_cookies = requests.utils.dict_from_cookiejar(session.cookies)
+
+                    def fetch_course_credit(course_code_fb, feedback_link):
+                        try:
+                            course_feedback_response = make_request(
+                                "GET",
+                                feedback_link,
+                                cookies=login_cookies,
+                                timeout=20,
+                            )
+                        except requests.exceptions.RequestException:
+                            return None
+
+                        if course_feedback_response.status_code != 200:
+                            return None
+
+                        course_feedback_soup = BeautifulSoup(
+                            course_feedback_response.text, "html.parser"
+                        )
+                        credit_div = course_feedback_soup.find(
+                            "div", style=lambda s: s and "font-size:35px" in s
+                        )
+                        if credit_div:
+                            return course_code_fb, credit_div.text.strip()
+                        return None
+
+                    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FEEDBACK) as executor:
+                        futures = [
+                            executor.submit(fetch_course_credit, course_code, link)
+                            for course_code, link in feedback_links
+                        ]
+                        for future in as_completed(futures):
                             try:
-                                course_feedback_response = make_request(
-                                    "GET", feedback_link, session=session, timeout=20
-                                )
-                            except requests.exceptions.RequestException:
-                                continue  # Skip this course's credit on failure
-
-                            if course_feedback_response.status_code == 200:
-                                course_feedback_soup = BeautifulSoup(
-                                    course_feedback_response.text, "html.parser"
-                                )
-                                credit_div = course_feedback_soup.find(
-                                    "div", style=lambda s: s and "font-size:35px" in s
-                                )
-                                if credit_div:
-                                    credit_value = credit_div.text.strip()
-                                    credit_mapping[course_code_fb] = credit_value
+                                result = future.result()
+                            except Exception:
+                                continue
+                            if result:
+                                course_code_fb, credit_value = result
+                                credit_mapping[course_code_fb] = credit_value
 
         for course in courses:
             code = course.get("CourseCode")
