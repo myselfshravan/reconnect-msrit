@@ -14,7 +14,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 app = Flask(__name__)
 
 # Bright Data proxy - auto-rotates IPs on each request
-PROXY_URL = "http://brd-customer-hl_1383ee4e-zone-datacenter_proxy_sis:hrtnuotx6xks@brd.superproxy.io:33335"
+PROXY_URL = "http://brd-customer-hl_a7655e30-zone-datacenter_proxy1:nel8ka9db2nn@brd.superproxy.io:33335"
 PROXIES = {"http": PROXY_URL, "https": PROXY_URL}
 MAX_RETRIES = 5
 RETRY_DELAY = 0.5  # seconds
